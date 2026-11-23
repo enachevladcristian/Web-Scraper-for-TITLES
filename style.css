@@ -12,9 +12,9 @@ p { line-height: 1.6; color: #536475; }
 .section-heading { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
 .badge { background: #eaf5f2; color: #176f65; padding: 6px 10px; border-radius: 20px; font-size: .75rem; white-space: nowrap; font-weight: 700; }
 label { display: block; font-size: .87rem; font-weight: 700; margin: 16px 0 7px; }
-input, textarea { font: inherit; color: inherit; border: 1px solid #cbd9dc; border-radius: 7px; padding: 11px 12px; width: 100%; background: #fff; }
+input, textarea, select { font: inherit; color: inherit; border: 1px solid #cbd9dc; border-radius: 7px; padding: 11px 12px; width: 100%; background: #fff; }
 textarea { resize: vertical; }
-input:focus, textarea:focus, button:focus-visible, a:focus-visible { outline: 3px solid #84d1bf; outline-offset: 2px; }
+input:focus, textarea:focus, select:focus, button:focus-visible, a:focus-visible { outline: 3px solid #84d1bf; outline-offset: 2px; }
 .keyword-row { display: flex; gap: 10px; margin-bottom: 10px; }
 .keyword-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 button { font: inherit; font-weight: 700; border: 0; border-radius: 7px; background: #176f65; color: white; padding: 11px 16px; cursor: pointer; white-space: nowrap; }

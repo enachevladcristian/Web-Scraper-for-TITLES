@@ -4,30 +4,35 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Articole pe scurt</title>
-  <link rel="stylesheet" href="style.css?v=2">
-  <script defer src="core.js"></script>
-  <script defer src="app.js?v=2"></script>
+  <link rel="stylesheet" href="style.css?v=3">
+  <script defer src="core.js?v=4"></script>
+  <script defer src="app.js?v=5"></script>
 </head>
 <body>
   <main>
     <header>
       <p class="eyebrow">LISTA TA LOCALĂ DE LECTURĂ</p>
-      <h1>Găsește articole după rezumat</h1>
-      <p>Caută în rezumatele disponibile prin OpenAlex sau verifică un rezumat copiat de tine. Salvează doar linkurile care te interesează.</p>
+      <h1>Găsește linkuri către articole</h1>
+      <p>Caută după cuvinte cheie și salvează local linkurile care te interesează.</p>
     </header>
 
     <aside class="notice">
-      <strong>Fără ocolirea restricțiilor.</strong> Aplicația nu accesează automat Google Scholar sau ScienceDirect și nu ocolește paywall-uri, autentificări ori CAPTCHA. Linkurile pot duce la articole cu acces restricționat.
+      <strong>Fără ocolirea restricțiilor.</strong> Aplicația folosește doar API-uri oficiale și nu ocolește paywall-uri, autentificări ori CAPTCHA. Nu accesează automat Google Scholar. Linkurile pot duce la articole cu acces restricționat.
     </aside>
 
     <section class="panel">
       <div class="section-heading">
-        <div><p class="eyebrow">01 / DESCOPERĂ</p><h2>Caută în OpenAlex</h2></div>
+        <div><p class="eyebrow">01 / DESCOPERĂ</p><h2>Caută articole</h2></div>
         <span class="badge">Metadate publice</span>
       </div>
-      <p>Adaugă cuvinte sau expresii. Toate trebuie să apară în rezumat, fără diferență între majuscule și minuscule.</p>
+      <p>Adaugă cuvinte sau expresii. Sursa selectată caută toate expresiile și returnează linkuri; disponibilitatea articolelor se verifică separat.</p>
       <form id="search-form">
-        <label for="keywords">Cuvinte cheie în rezumat</label>
+        <label for="source">Sursa rezultatelor</label>
+        <select id="source">
+          <option value="openalex">OpenAlex</option>
+          <option value="sciencedirect">ScienceDirect (API Elsevier)</option>
+        </select>
+        <label for="keywords">Cuvinte cheie</label>
         <div id="keyword-list">
           <div class="keyword-row">
             <input id="keywords" class="keyword-input" type="text" placeholder="ex. climate change">
@@ -37,9 +42,15 @@
           <button type="button" class="secondary" id="add-keyword">+ Adaugă cuvânt cheie</button>
           <button type="submit" id="search-button">Caută articole</button>
         </div>
-        <label for="api-key">Cheie API OpenAlex <span class="muted">(opțională)</span></label>
-        <input id="api-key" type="password" autocomplete="off" placeholder="Folosește o cheie dacă este necesar">
-        <p class="hint">Poți separa expresiile și prin virgulă. Căutarea trimite prima expresie către OpenAlex; celelalte sunt verificate local în rezumat. Cuvintele se aplică și verificării manuale. Cheia nu este salvată. <a href="https://help.openalex.org/api/" target="_blank" rel="noopener noreferrer">Despre API-ul OpenAlex ↗</a></p>
+        <div id="openalex-key-field">
+          <label for="api-key">Cheie API OpenAlex <span class="muted">(opțională)</span></label>
+          <input id="api-key" type="password" autocomplete="off" placeholder="Folosește o cheie dacă este necesar">
+        </div>
+        <div id="elsevier-key-field">
+          <label for="elsevier-key">Cheie API Elsevier <span class="muted">(necesară pentru ScienceDirect)</span></label>
+          <input id="elsevier-key" type="password" autocomplete="off" placeholder="Cheie cu acces la ScienceDirect Search API">
+        </div>
+        <p class="hint">Poți separa expresiile și prin virgulă. Căutarea combină expresiile cu AND și este efectuată de sursa selectată; nu sunt descărcate rezumate. Cheile nu sunt salvate. <a href="https://dev.elsevier.com/" target="_blank" rel="noopener noreferrer">Cheie Elsevier ↗</a> · <a href="https://help.openalex.org/api/" target="_blank" rel="noopener noreferrer">API OpenAlex ↗</a></p>
       </form>
       <p id="search-status" class="status" role="status" aria-live="polite"></p>
       <ul id="results" class="link-list"></ul>
@@ -48,32 +59,14 @@
 
     <section class="panel">
       <div class="section-heading">
-        <div><p class="eyebrow">02 / VERIFICĂ</p><h2>Verifică un rezumat manual</h2></div>
-      </div>
-      <p>Poți copia un rezumat pe care îl poți vedea legal, inclusiv din ScienceDirect sau dintr-o pagină găsită prin Google Scholar. Textul este folosit doar pentru verificare, nu este salvat.</p>
-      <form id="manual-form">
-        <label for="manual-title">Titlul articolului</label>
-        <input id="manual-title" type="text" required>
-        <label for="manual-url">Linkul articolului</label>
-        <input id="manual-url" type="url" placeholder="https://..." required>
-        <label for="manual-abstract">Rezumatul</label>
-        <textarea id="manual-abstract" rows="5" required></textarea>
-        <button type="submit">Verifică rezumatul</button>
-      </form>
-      <p id="manual-status" class="status" role="status" aria-live="polite"></p>
-      <ul id="manual-result" class="link-list"></ul>
-    </section>
-
-    <section class="panel">
-      <div class="section-heading">
-        <div><p class="eyebrow">03 / PĂSTREAZĂ</p><h2>Linkuri salvate</h2></div>
+        <div><p class="eyebrow">02 / PĂSTREAZĂ</p><h2>Linkuri salvate</h2></div>
         <span class="badge" id="saved-count">0 linkuri</span>
       </div>
       <p>Lista rămâne în acest browser, pe acest dispozitiv. Ștergerea datelor browserului o poate elimina.</p>
       <p id="saved-status" class="status" role="status" aria-live="polite"></p>
       <ul id="saved-list" class="link-list"></ul>
     </section>
-    <footer>Creat pentru descoperire responsabilă · Rezumatele nu sunt salvate</footer>
+    <footer>Creat pentru descoperire responsabilă · Sunt salvate doar linkurile</footer>
   </main>
 </body>
 </html>

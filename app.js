@@ -1,10 +1,9 @@
 "use strict";
 
-const { keywordsFrom, matchesAbstract, safeUrl, matchingWorks } = ArticleCore;
+const { keywordsFrom, searchQuery, safeUrl, openAlexLinks, scienceDirectLinks } = ArticleCore;
 const storageKey = "article-links-v1";
 const elements = Object.fromEntries([
-  "search-form", "keyword-list", "add-keyword", "api-key", "search-button", "search-status", "results", "next-page",
-  "manual-form", "manual-title", "manual-url", "manual-abstract", "manual-status", "manual-result",
+  "search-form", "source", "keyword-list", "add-keyword", "api-key", "openalex-key-field", "elsevier-key", "search-button", "search-status", "results", "next-page",
   "saved-list", "saved-count", "saved-status"
 ].map((id) => [id, document.getElementById(id)]));
 
@@ -12,6 +11,10 @@ let saved = [];
 let search = null;
 let busy = false;
 let storageReadable = true;
+
+elements.source.addEventListener("change", () => {
+  elements["openalex-key-field"].hidden = elements.source.value !== "openalex";
+});
 
 function currentKeywords() {
   return Array.from(elements["keyword-list"].querySelectorAll(".keyword-input"))
@@ -104,32 +107,60 @@ function showMatches(container, links) {
   for (const item of links) container.append(linkRow(item, "Salvează", () => saveLink(item)));
 }
 
+async function openAlexRequest(url) {
+  const headers = {};
+  if (search.apiKey) headers.Authorization = `Bearer ${search.apiKey}`;
+  const response = await fetch(url, { headers });
+  if (!response.ok) throw new Error(`OpenAlex a răspuns cu HTTP ${response.status}`);
+  const data = await response.json();
+  if (!Array.isArray(data.results) || !data.meta || typeof data.meta.count !== "number") {
+    throw new Error("OpenAlex a returnat un răspuns neașteptat");
+  }
+  return data;
+}
+
+async function openAlexPage(page) {
+  const url = new URL("https://api.openalex.org/works");
+  url.searchParams.set("search", search.query);
+  url.searchParams.set("per-page", "50");
+  url.searchParams.set("page", String(page));
+  url.searchParams.set("select", "title,doi,primary_location");
+  const data = await openAlexRequest(url);
+  return { ...openAlexLinks(data.results), checked: data.results.length,
+    count: data.meta.count, more: data.results.length === 50 && page * 50 < data.meta.count && page < 200 };
+}
+
+async function scienceDirectPage(page) {
+  const response = await fetch("https://api.elsevier.com/content/search/sciencedirect", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", "Accept": "application/json", "X-ELS-APIKey": search.elsevierKey },
+    body: JSON.stringify({ qs: search.query, display: { offset: (page - 1) * 50, show: 50 } })
+  });
+  if (!response.ok) throw new Error(`ScienceDirect a răspuns cu HTTP ${response.status}; verifică accesul API și limita cheii`);
+  const data = await response.json();
+  if (!Array.isArray(data.results) || typeof data.resultsFound !== "number" ||
+      data.results.some((item) => !item || typeof item !== "object")) {
+    throw new Error("ScienceDirect a returnat un răspuns neașteptat");
+  }
+  return { ...scienceDirectLinks(data.results), checked: data.results.length,
+    count: data.resultsFound, more: data.results.length === 50 && page * 50 < data.resultsFound && page * 50 <= 6000 };
+}
+
 async function fetchPage(page) {
   if (!search || busy) return;
   busy = true;
   elements["search-button"].disabled = true;
   elements["next-page"].disabled = true;
-  elements["search-status"].textContent = "Se caută în OpenAlex…";
+  elements["search-status"].textContent = search.source === "sciencedirect" ? "Se caută în ScienceDirect…" : "Se caută în OpenAlex…";
   elements.results.replaceChildren();
   try {
-    const url = new URL("https://api.openalex.org/works");
-    url.searchParams.set("search", search.keywords[0]);
-    url.searchParams.set("per-page", "50");
-    url.searchParams.set("page", String(page));
-    url.searchParams.set("select", "title,doi,primary_location,abstract_inverted_index");
-    const headers = {};
-    if (search.apiKey) headers.Authorization = `Bearer ${search.apiKey}`;
-    const response = await fetch(url, { headers });
-    if (!response.ok) throw new Error(`OpenAlex a răspuns cu HTTP ${response.status}.`);
-    const data = await response.json();
-    if (!Array.isArray(data.results) || !data.meta || typeof data.meta.count !== "number") {
-      throw new Error("OpenAlex a returnat un răspuns neașteptat.");
-    }
-    const { links, missingAbstracts, missingLinks } = matchingWorks(data.results, search.keywords);
+    const { links, missingLinks, checked, count, more } = search.source === "sciencedirect"
+      ? await scienceDirectPage(page) : await openAlexPage(page);
     showMatches(elements.results, links);
     search.page = page;
-    elements["search-status"].textContent = `Pagina ${page}: ${links.length} potriviri din ${data.results.length} rezultate verificate; ${missingAbstracts} fără rezumat disponibil${missingLinks ? `; ${missingLinks} fără titlu sau link valid` : ""}. OpenAlex indică ${data.meta.count} rezultate pentru prima expresie.`;
-    elements["next-page"].hidden = data.results.length < 50 || page * 50 >= data.meta.count || page >= 200;
+    const sourceName = search.source === "sciencedirect" ? "ScienceDirect" : "OpenAlex";
+    elements["search-status"].textContent = `Pagina ${page}: ${links.length} linkuri din ${checked} rezultate${missingLinks ? `; ${missingLinks} fără titlu sau link valid` : ""}. ${sourceName} indică ${count} rezultate pentru căutare.`;
+    elements["next-page"].hidden = !more;
   } catch (error) {
     elements["search-status"].textContent = `Căutarea nu a reușit: ${error.message}. Verifică conexiunea, limitele sau cheia API; încearcă din nou.`;
     elements["next-page"].hidden = search.page === 0;
@@ -148,30 +179,28 @@ elements["search-form"].addEventListener("submit", (event) => {
     elements["search-status"].textContent = "Introdu cel puțin un cuvânt sau o expresie.";
     return;
   }
-  search = { keywords, apiKey: elements["api-key"].value.trim(), page: 0 };
+  const source = elements.source.value;
+  const query = searchQuery(keywords);
+  if (!query) {
+    elements["search-status"].textContent = "Cuvintele cheie nu pot conține ghilimele sau caracterul backslash.";
+    return;
+  }
+  const elsevierKey = elements["elsevier-key"].value.trim();
+  if (source === "sciencedirect" && !elsevierKey) {
+    elements["search-status"].textContent = "Introdu o cheie Elsevier cu acces la ScienceDirect Search API.";
+    return;
+  }
+  if (source === "sciencedirect" && query.length > 250) {
+    elements["search-status"].textContent = "Căutarea combinată poate avea cel mult 250 de caractere pentru ScienceDirect.";
+    return;
+  }
+  search = { source, query, apiKey: elements["api-key"].value.trim(), elsevierKey, page: 0 };
   elements["next-page"].hidden = true;
   fetchPage(1);
 });
 
 elements["next-page"].addEventListener("click", () => {
   if (search && !busy) fetchPage(search.page + 1);
-});
-
-elements["manual-form"].addEventListener("submit", (event) => {
-  event.preventDefault();
-  elements["manual-result"].replaceChildren();
-  const keywords = currentKeywords();
-  const url = safeUrl(elements["manual-url"].value);
-  const title = elements["manual-title"].value.trim();
-  const abstract = elements["manual-abstract"].value.trim();
-  if (!keywords.length || !url || !title || !abstract) {
-    elements["manual-status"].textContent = "Completează cuvintele cheie, titlul, un link HTTP(S) valid și rezumatul.";
-    return;
-  }
-  const matches = matchesAbstract(abstract, keywords);
-  elements["manual-abstract"].value = "";
-  elements["manual-status"].textContent = matches ? "Rezumatul conține toate expresiile." : "Rezumatul nu conține toate expresiile.";
-  if (matches) showMatches(elements["manual-result"], [{ title, url }]);
 });
 
 try {

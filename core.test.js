@@ -2,31 +2,33 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { keywordsFrom, matchesAbstract, reconstructAbstract, safeUrl, matchingWorks } = require("./core.js");
+const { keywordsFrom, searchQuery, safeUrl, openAlexLinks, scienceDirectLinks } = require("./core.js");
 
-test("keywords require all literal phrases, ignoring case", () => {
+test("combines all keywords as quoted search phrases", () => {
   const keywords = keywordsFrom(" Climate Change, biodiversity, ");
-  assert.deepEqual(keywords, ["climate change", "biodiversity"]);
-  assert.equal(matchesAbstract("BIODIVERSITY and climate change", keywords), true);
-  assert.equal(matchesAbstract("Climate change alone", keywords), false);
-  assert.equal(matchesAbstract("anything", []), false);
+  assert.equal(searchQuery(keywords), '"climate change" AND "biodiversity"');
+  assert.equal(searchQuery([]), null);
+  assert.equal(searchQuery(['bad"query']), null);
+  assert.equal(searchQuery(["bad\\query"]), null);
 });
 
-test("reconstructs the abstract in position order", () => {
-  assert.equal(reconstructAbstract({ change: [1], climate: [0, 3], affects: [2] }), "climate change affects climate");
-  assert.equal(reconstructAbstract(null), "");
+test("ScienceDirect links do not depend on DOI or abstracts and reject unsafe links", () => {
+  assert.deepEqual(scienceDirectLinks([
+    { title: "Match", uri: "https://www.sciencedirect.com/science/article/pii/1" },
+    { title: "Unsafe", uri: "https://sciencedirect.com.evil.example/article" },
+    { title: "No link" }
+  ]), {
+    links: [{ title: "Match", url: "https://www.sciencedirect.com/science/article/pii/1" }],
+    missingLinks: 2
+  });
 });
 
-test("returns only matching links and counts missing data", () => {
-  const works = [
-    { title: "Match", doi: "https://doi.org/10.1/test", abstract_inverted_index: { climate: [0], change: [1] } },
-    { title: "Other", doi: "https://example.com/other", abstract_inverted_index: { unrelated: [0] } },
-    { title: "No abstract", doi: "https://example.com/no", abstract_inverted_index: null },
-    { title: "No safe link", doi: "javascript:alert(1)", abstract_inverted_index: { climate: [0], change: [1] } }
-  ];
-  assert.deepEqual(matchingWorks(works, ["climate change"]), {
+test("OpenAlex links use public landing pages or DOIs without abstracts", () => {
+  assert.deepEqual(openAlexLinks([
+    { title: "Match", doi: "https://doi.org/10.1/test" },
+    { title: "No safe link", doi: "javascript:alert(1)" }
+  ]), {
     links: [{ title: "Match", url: "https://doi.org/10.1/test" }],
-    missingAbstracts: 1,
     missingLinks: 1
   });
   assert.equal(safeUrl("javascript:alert(1)"), null);
