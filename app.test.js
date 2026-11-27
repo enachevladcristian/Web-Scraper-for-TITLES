@@ -31,17 +31,23 @@ function app(fetch) {
     createElement() { return new Element(); }
   };
   const storage = new Map();
+  const downloads = [];
   const localStorage = {
     getItem: (key) => storage.get(key) || null,
     setItem: (key, value) => storage.set(key, value)
   };
-  const context = { ArticleCore, document, localStorage, URL, fetch };
+  class BrowserURL extends URL {
+    static createObjectURL(blob) { downloads.push({ blob }); return "blob:test"; }
+    static revokeObjectURL(url) { downloads[0].revoked = url; }
+  }
+  Element.prototype.click = function () { downloads[downloads.length - 1].filename = this.download; };
+  const context = { ArticleCore, document, localStorage, URL: BrowserURL, Blob, setTimeout, fetch };
   vm.runInNewContext(fs.readFileSync("app.js", "utf8"), context);
   const get = (id) => document.getElementById(id);
   get("keyword-list").children = [{ value: "climate, biodiversity" }];
   get("source").value = "sciencedirect";
   get("elsevier-key").value = "test-key";
-  return { get, storage, submit: () => get("search-form").listeners.submit({ preventDefault() {} }) };
+  return { get, storage, downloads, submit: () => get("search-form").listeners.submit({ preventDefault() {} }) };
 }
 
 test("ScienceDirect search returns links without fetching abstracts", async () => {
@@ -68,6 +74,12 @@ test("ScienceDirect search returns links without fetching abstracts", async () =
   row.children[1].listeners.click();
   const saved = JSON.parse(instance.storage.get("article-links-v1"));
   assert.deepEqual(saved, [{ title: "Match", url: "https://www.sciencedirect.com/science/article/pii/test" }]);
+  assert.equal(instance.get("export-csv").disabled, false);
+  instance.get("export-csv").listeners.click();
+  assert.equal(instance.downloads[0].filename, "articole.csv");
+  assert.equal(Buffer.from(await instance.downloads[0].blob.arrayBuffer()).toString("utf8"), '\uFEFFTitlu,URL\r\n"Match","https://www.sciencedirect.com/science/article/pii/test"\r\n');
+  instance.get("saved-list").children[0].children[1].listeners.click();
+  assert.equal(instance.get("export-csv").disabled, true);
 });
 
 test("OpenAlex search requests only link metadata", async () => {

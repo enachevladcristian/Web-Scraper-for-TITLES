@@ -14,6 +14,8 @@ Aplicația nu accesează automat Google Scholar sau paginile articolelor și nu 
 
 Doar titlul și URL-ul linkurilor salvate sunt stocate în `localStorage` în browserul curent. Ștergerea datelor browserului poate șterge lista.
 
+Pentru a descărca toate linkurile salvate, apasă **Descarcă lista CSV**. Fișierul conține coloanele `Titlu` și `URL`, se generează local și nu este trimis pe server. Pentru siguranța deschiderii în aplicații de calcul tabelar, titlurile care pot fi interpretate ca formule primesc un apostrof la început. Lista de pe GitHub Pages este separată de cea de pe localhost, deoarece fiecare adresă are propriul spațiu local de stocare.
+
 ## Teste
 
 Rulează `node --test core.test.js app.test.js` cu o versiune Node.js care include test runnerul integrat.

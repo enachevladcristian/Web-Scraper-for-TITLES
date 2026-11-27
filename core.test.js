@@ -2,7 +2,15 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { keywordsFrom, searchQuery, safeUrl, openAlexLinks, scienceDirectLinks } = require("./core.js");
+const { keywordsFrom, searchQuery, safeUrl, openAlexLinks, scienceDirectLinks, linksCsv } = require("./core.js");
+
+test("CSV preserves Unicode, quotes and line breaks and protects spreadsheet formulas", () => {
+  const csv = linksCsv([
+    { title: 'Știință, "test"\nlinie', url: "https://example.com/a,b" },
+    { title: "  =1+1", url: "https://example.com/2" }
+  ]);
+  assert.equal(csv, '\uFEFFTitlu,URL\r\n"Știință, ""test""\nlinie","https://example.com/a,b"\r\n"\'  =1+1","https://example.com/2"\r\n');
+});
 
 test("combines all keywords as quoted search phrases", () => {
   const keywords = keywordsFrom(" Climate Change, biodiversity, ");

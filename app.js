@@ -1,10 +1,10 @@
 "use strict";
 
-const { keywordsFrom, searchQuery, safeUrl, openAlexLinks, scienceDirectLinks } = ArticleCore;
+const { keywordsFrom, searchQuery, safeUrl, openAlexLinks, scienceDirectLinks, linksCsv } = ArticleCore;
 const storageKey = "article-links-v1";
 const elements = Object.fromEntries([
   "search-form", "source", "keyword-list", "add-keyword", "api-key", "openalex-key-field", "elsevier-key", "search-button", "search-status", "results", "next-page",
-  "saved-list", "saved-count", "saved-status"
+  "saved-list", "saved-count", "saved-status", "export-csv"
 ].map((id) => [id, document.getElementById(id)]));
 
 let saved = [];
@@ -46,6 +46,7 @@ elements["add-keyword"].addEventListener("click", () => {
 function showSaved() {
   elements["saved-list"].replaceChildren();
   elements["saved-count"].textContent = `${saved.length} ${saved.length === 1 ? "link" : "linkuri"}`;
+  elements["export-csv"].disabled = !saved.length;
   if (!saved.length) {
     const empty = document.createElement("li");
     empty.className = "empty";
@@ -59,6 +60,17 @@ function showSaved() {
     }));
   }
 }
+
+elements["export-csv"].addEventListener("click", () => {
+  if (!saved.length) return;
+  const blob = new Blob([linksCsv(saved)], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "articole.csv";
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
 
 function persist(items) {
   if (!storageReadable) {

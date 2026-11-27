@@ -20,6 +20,17 @@
     }
   }
 
+  function linksCsv(items) {
+    function cell(value) {
+      const safe = /^[\s\u0000-\u001f]*[=+\-@]/.test(value) ? `'${value}` : value;
+      return `"${safe.replace(/"/g, '""')}"`;
+    }
+    return "\uFEFF" + [
+      "Titlu,URL",
+      ...items.map((item) => `${cell(item.title)},${cell(item.url)}`)
+    ].join("\r\n") + "\r\n";
+  }
+
   function openAlexLinks(works) {
     const links = [];
     let missingLinks = 0;
@@ -51,7 +62,7 @@
     return { links, missingLinks };
   }
 
-  const core = { keywordsFrom, searchQuery, safeUrl, openAlexLinks, scienceDirectLinks };
+  const core = { keywordsFrom, searchQuery, safeUrl, openAlexLinks, scienceDirectLinks, linksCsv };
   if (typeof module !== "undefined" && module.exports) module.exports = core;
   root.ArticleCore = core;
 })(globalThis);
