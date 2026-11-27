@@ -19,7 +19,8 @@ input:focus, textarea:focus, select:focus, button:focus-visible, a:focus-visible
 .keyword-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 button { font: inherit; font-weight: 700; border: 0; border-radius: 7px; background: #176f65; color: white; padding: 11px 16px; cursor: pointer; white-space: nowrap; }
 button:hover { background: #115b53; }
-button:disabled { opacity: .55; cursor: wait; }
+button:disabled { opacity: .55; cursor: not-allowed; }
+#search-button:disabled, #next-page:disabled { cursor: wait; }
 button[hidden] { display: none; }
 form > button { margin-top: 14px; }
 .secondary, .small-button { color: #176f65; background: #eaf5f2; }
